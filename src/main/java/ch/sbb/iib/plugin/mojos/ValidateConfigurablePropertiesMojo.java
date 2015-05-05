@@ -14,6 +14,8 @@ import static org.twdata.maven.mojoexecutor.MojoExecutor.version;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Enumeration;
+import java.util.Iterator;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -32,6 +34,8 @@ import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.util.FileUtils;
+import com.ibm.broker.config.proxy.BarFile;
+import com.ibm.broker.config.proxy.DeploymentDescriptor;
 
 import ch.sbb.iib.plugin.utils.ConfigurablePropertiesUtil;
 import ch.sbb.iib.plugin.utils.ProcessOutputLogger;
@@ -112,17 +116,17 @@ public class ValidateConfigurablePropertiesMojo extends AbstractMojo {
 
         getLog().info("Reading bar file: " + barName);
 
-        List<String> params = new ArrayList<String>();
-        params.add("-b");
-        params.add(barName.getAbsolutePath());
+        //List<String> params = new ArrayList<String>();
+        //params.add("-b");
+        //params.add(barName.getAbsolutePath());
 
-        List<String> output = executeReadBar(params);
+        //List<String> output = executeReadBar(params);
 
-        List<String> configurableProperties = getConfigurableProperties(output);
+        List<String> configurableProperties = getConfigurableProperties(barName.getAbsolutePath());
 
         writeToFile(configurableProperties, defaultPropertiesFile);
 
-        validatePropertiesFiles(ConfigurablePropertiesUtil.getPropNames(configurableProperties));
+        validatePropertiesFiles(configurableProperties);
 
         if (applyBarOverride) {
             executeApplyBarOverrides();
@@ -177,14 +181,14 @@ public class ValidateConfigurablePropertiesMojo extends AbstractMojo {
                 params.add(propFile.getAbsolutePath());
 
                 // (Optional) The name of an application in the BAR file
-                params.add("-k");
-                params.add(getApplicationName());
+                //params.add("-k");
+                //params.add(getApplicationName());
 
                 // (Optional) A list of the property-name=override pairs, current-property-value=override pairs.
                 // -m
 
                 // (Optional) Specifies that all deployment descriptor files are updated recursively.
-                // -r
+                params.add("-r");
 
                 // (Optional) Specifies that the internal trace is to be sent to the named file.
                 // TODO
@@ -446,6 +450,25 @@ public class ValidateConfigurablePropertiesMojo extends AbstractMojo {
 
         }
 
+    }
+    /**
+     * @param bar file
+     * @return a list of properties that can be overriden for a given bar file
+     */
+    private List<String> getConfigurableProperties(String barFile) throws MojoFailureException {
+	List<String> configurableProperties = new ArrayList<String>();
+        BarFile b;
+	try {
+		b = BarFile.loadBarFile(barFile);
+		DeploymentDescriptor d = b.getDeploymentDescriptor();
+		Enumeration<String> ids = d.getPropertyIdentifiers();
+		while(ids.hasMoreElements()) {
+		    configurableProperties.add(ids.nextElement());
+	        }
+	} catch (IOException e) {
+		throw new MojoFailureException("Cannot read bar file:" + barFile,e);
+	}
+	return configurableProperties;
     }
 
     /**
